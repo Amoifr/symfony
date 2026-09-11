@@ -89,6 +89,15 @@ class PhraseProvider implements ProviderInterface
     {
         $translatorBag = new TranslatorBag();
 
+        if (!$locales) {
+            if (!$this->phraseLocales) {
+                $this->initLocales();
+            }
+
+            // getLocale() looks locales up by name, so reading them all goes through their names too
+            $locales = str_replace('-', '_', array_keys($this->phraseLocales));
+        }
+
         foreach ($locales as $locale) {
             $phraseLocale = $this->getLocale($locale);
 

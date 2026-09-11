@@ -257,6 +257,34 @@ class PhraseProviderTest extends TestCase
         $provider->read([$domain], [$locale]);
     }
 
+    public function testReadWithoutLocales()
+    {
+        $this->getLoader()
+            ->method('load')
+            ->willReturnCallback(static fn (string $content, string $locale, string $domain) => new MessageCatalogue($locale, [$domain => ['a' => $content]]));
+
+        $responses = [
+            'init locales' => $this->getInitLocaleResponseMock(),
+            'download de' => $this->getDownloadLocaleResponseMock('messages', '5fea6ed5c21767730918a9400e420832', 'trans_de_a'),
+            'download en-GB' => $this->getDownloadLocaleResponseMock('messages', '13604ec993beefcdaba732812cdb828c', 'trans_en_GB_a'),
+        ];
+
+        $provider = $this->createProvider(httpClient: $httpClient = (new MockHttpClient($responses))->withOptions([
+            'base_uri' => 'https://api.phrase.com/api/v2/projects/1/',
+            'headers' => [
+                'Authorization' => 'token API_TOKEN',
+                'User-Agent' => 'myProject',
+            ],
+        ]), endpoint: 'api.phrase.com/api/v2');
+
+        $translatorBag = $provider->read(['messages'], []);
+
+        $this->assertSame(['de', 'en_GB'], array_map(static fn (MessageCatalogue $catalogue) => $catalogue->getLocale(), $translatorBag->getCatalogues()));
+        $this->assertSame(['a' => 'trans_en_GB_a'], $translatorBag->getCatalogue('en_GB')->all('messages'));
+        // no locale is created on the way
+        $this->assertSame(\count($responses), $httpClient->getRequestsCount());
+    }
+
     #[DataProvider('cacheKeyProvider')]
     public function testCacheKeyOptionsSort(array $options, string $expectedKey)
     {
