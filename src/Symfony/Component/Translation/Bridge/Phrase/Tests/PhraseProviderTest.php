@@ -285,6 +285,35 @@ class PhraseProviderTest extends TestCase
         $this->assertSame(\count($responses), $httpClient->getRequestsCount());
     }
 
+    public function testReadWithoutDomains()
+    {
+        $this->getLoader()
+            ->method('load')
+            ->willReturnCallback(static fn (string $content, string $locale, string $domain) => new MessageCatalogue($locale, [$domain => ['a' => $content]]));
+
+        $responses = [
+            'list tags' => $this->getTagsResponseMock(),
+            'init locales' => $this->getInitLocaleResponseMock(),
+            'download messages' => $this->getDownloadLocaleResponseMock('messages', '5fea6ed5c21767730918a9400e420832', 'trans_de_messages_a'),
+            'download validators' => $this->getDownloadLocaleResponseMock('validators', '5fea6ed5c21767730918a9400e420832', 'trans_de_validators_a'),
+        ];
+
+        $provider = $this->createProvider(httpClient: $httpClient = (new MockHttpClient($responses))->withOptions([
+            'base_uri' => 'https://api.phrase.com/api/v2/projects/1/',
+            'headers' => [
+                'Authorization' => 'token API_TOKEN',
+                'User-Agent' => 'myProject',
+            ],
+        ]), endpoint: 'api.phrase.com/api/v2');
+
+        $translatorBag = $provider->read([], ['de']);
+
+        // the tags of the project are the domains, under their own names
+        $this->assertSame(['a' => 'trans_de_messages_a'], $translatorBag->getCatalogue('de')->all('messages'));
+        $this->assertSame(['a' => 'trans_de_validators_a'], $translatorBag->getCatalogue('de')->all('validators'));
+        $this->assertSame(\count($responses), $httpClient->getRequestsCount());
+    }
+
     #[DataProvider('cacheKeyProvider')]
     public function testCacheKeyOptionsSort(array $options, string $expectedKey)
     {
@@ -1087,6 +1116,27 @@ class PhraseProviderTest extends TestCase
                 'ETag' => 'W/"625d11cf081b1697cbc216edf6ebb13c"',
                 'Last-Modified' => 'Wed, 28 Dec 2022 13:16:45 GMT',
             ]]);
+        };
+    }
+
+    private function getTagsResponseMock(): \Closure
+    {
+        return function (string $method, string $url): ResponseInterface {
+            $this->assertSame('GET', $method);
+            $this->assertSame('https://api.phrase.com/api/v2/projects/1/tags?per_page=100&page=1', $url);
+
+            return new JsonMockResponse([
+                [
+                    'name' => 'messages',
+                    'keys_count' => 2,
+                    'system_tag' => false,
+                ],
+                [
+                    'name' => 'validators',
+                    'keys_count' => 1,
+                    'system_tag' => false,
+                ],
+            ]);
         };
     }
 

@@ -5,6 +5,7 @@ CHANGELOG
 ---
 
  * Make `PhraseProvider::read()` fetch every locale when passed none
+ * Make `PhraseProvider::read()` fetch every domain when passed none
 
 6.4
 ---
